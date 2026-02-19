@@ -40,13 +40,13 @@
                     <option value="">--</option>
                     {% for c in palette %}
                       {% set selected = '' %}
-                      {% if choices|length >= i and choices[i-1][0] == c %}
+                      {% if slot_choices|length >= i and slot_choices[i-1][0] == c %}
                         {% set selected = 'selected' %}
                       {% endif %}
                       <option value="{{c}}" {{selected}}>{{c}}</option>
                     {% endfor %}
                   </select>
-                  <input class="weight" type="number" name="weight_{{i}}" min="0" max="1000" step="1" value="0">
+                  <input class="weight" type="number" name="weight_{{i}}" min="0" max="1000" step="1" value="{{ slot_choices[i-1][1]|int if slot_choices|length >= i else 0 }}">
                   <button type="button" class="remove small">Remove</button>
                 </div>
               {% endfor %}
@@ -54,10 +54,32 @@
 
           </section>
 
-          <div class="grid-settings bottom">
+          <!-- Randomize controls placed after hotbar -->
+          <div class="randomize-controls" style="padding:10px 0;border-top:1px dashed #eee;margin-top:10px">
+            <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px">
+              <button type="button" id="randHotbar" class="small" title="Randomize hotbar (R)">Randomize (R)</button>
+              <button type="button" id="randSubset" class="small" title="Randomize subset (S)">Randomize Subset (S)</button>
+              <span style="color:#6b7280;font-size:13px">Hotkeys: R/S</span>
+            </div>
+            <div style="font-size:13px;color:#374151;margin-bottom:6px">Pick subset for Randomize Subset (S):</div>
+            <div class="subset-grid">
+              {% for c in palette %}
+                {% set rgb = palette_map.get(c) %}
+                <button type="button" class="subset-color {% if subset_selected and c in subset_selected %}selected{% endif %}" data-color="{{c}}" title="Toggle {{c}}">
+                  <span class="swatch" style="background: rgb({{rgb[0]}}, {{rgb[1]}}, {{rgb[2]}})"></span>
+                </button>
+              {% endfor %}
+            </div>
+            <!-- hidden subset input persists selection across submits -->
+            <input type="hidden" name="subset" id="subsetInput" value="{{ subset_selected|join(',') if subset_selected else '' }}">
+          </div>
+
+          <!-- Grid/Size settings moved to bottom -->
+          <div class="grid-settings bottom" style="margin-top:auto;border-top:1px solid #e6e6e6;padding-top:12px">
+            <h3 style="font-size:14px;margin:0 0 8px 0;color:#555">Dimensions</h3>
+            <label>Width (blocks): <input name="width" value="{{width}}"></label>
             <label>Height (blocks): <input name="height" value="{{height}}"></label>
             <label>Pixels per block: <input name="block_px" value="{{block_px}}"></label>
-            <label>Width (blocks): <input name="width" value="{{width}}"></label>
           </div>
             </section>
 
@@ -69,7 +91,7 @@
           <div class="legend">
             <h3 style="margin:0 0 8px 0;font-size:16px;">Unique Colors Used</h3>
             <ul>
-              {% for name, w in choices %}
+              {% for name, w in legend_choices %}
                 {% set rgb = palette_map.get(name) %}
                 {% if rgb %}
                   <li title="Weight: {{w}}">
@@ -85,6 +107,7 @@
           </div>
           <div class="preview-actions">
             <button type="submit" form="settingsForm" class="generate-primary" title="Generate new pattern">Generate Preview</button>
+            <span class="hint" aria-hidden="true">Press Enter</span>
           </div>
         </div>
 

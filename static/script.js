@@ -116,4 +116,87 @@ document.addEventListener('DOMContentLoaded', function(){
 
   // initial calc
   recalc();
+
+  // global key handlers: Enter -> generate; R -> randomize; S -> randomize subset
+  const genBtn = document.querySelector('.generate-primary');
+  const randBtn = document.getElementById('randHotbar');
+  const randSubsetBtn = document.getElementById('randSubset');
+  const subsetSelect = document.getElementById('subsetSelect');
+
+  function randomizeHotbar(colorsArr){
+    const slots = getSlots();
+    const total = slots.length;
+    if(!colorsArr || colorsArr.length === 0) return;
+    const maxAttempts = 30;
+    for(let attempt=0; attempt<maxAttempts; attempt++){
+      const n = Math.floor(Math.random() * (total - 2 + 1)) + 2; // 2..total
+      const picks = [];
+      for(let i=0;i<n;i++) picks.push(colorsArr[Math.floor(Math.random()*colorsArr.length)]);
+      const allSame = picks.every(c=>c === picks[0]);
+      if(!allSame || colorsArr.length === 1){
+        // apply picks to first n slots, clear rest
+        slots.forEach((row, idx)=>{
+          const sel = row.querySelector('.slot-select');
+          const w = row.querySelector('.weight');
+          if(idx < n){ sel.value = picks[idx]; }
+          else { sel.value = ''; }
+          w.value = 0;
+        });
+        recalc();
+        // trigger generate preview so users can quickly see results
+        if(genBtn) genBtn.click();
+        return;
+      }
+    }
+    alert('Could not generate a varied hotbar from the provided colors. Try a larger subset.');
+  }
+
+  if(randBtn) randBtn.addEventListener('click', ()=> randomizeHotbar(Object.keys(colorMap)));
+  if(randSubsetBtn) randSubsetBtn.addEventListener('click', ()=>{
+    // collect subset from swatch grid
+    const chosen = Array.from(document.querySelectorAll('.subset-color.selected')).map(b=>b.dataset.color);
+    if(chosen.length < 2){ alert('Please select at least 2 colors for subset randomization.'); return; }
+    randomizeHotbar(chosen);
+  });
+
+  document.addEventListener('keydown', (e) => {
+    // ignore when typing in inputs or textareas
+    const active = document.activeElement;
+    if(active && (active.tagName === 'TEXTAREA' || (active.tagName === 'INPUT' && active.type !== 'checkbox')) ) return;
+    if (e.key === 'Enter' && !e.ctrlKey && !e.altKey && !e.metaKey) {
+      e.preventDefault();
+      if (genBtn) genBtn.click();
+    }
+    if (e.key === 'r' || e.key === 'R'){
+      e.preventDefault();
+      if(randBtn) randBtn.click();
+    }
+    if (e.key === 's' || e.key === 'S'){
+      e.preventDefault();
+      if(randSubsetBtn) randSubsetBtn.click();
+    }
+  });
+
+  // subset swatch toggles
+  document.querySelectorAll('.subset-color').forEach(b=>{
+    b.addEventListener('click', ()=>{
+      b.classList.toggle('selected');
+      // update hidden subset input so selection persists across submits
+      const selected = Array.from(document.querySelectorAll('.subset-color.selected')).map(x=>x.dataset.color);
+      const subsetInput = document.getElementById('subsetInput');
+      if(subsetInput) subsetInput.value = selected.join(',');
+    });
+  });
+
+  // ensure hidden subset input matches initial selected swatches on load
+  const initialSubsetInput = document.getElementById('subsetInput');
+  if(initialSubsetInput){
+    const val = initialSubsetInput.value || '';
+    if(val){
+      const list = val.split(',');
+      document.querySelectorAll('.subset-color').forEach(b=>{
+        if(list.includes(b.dataset.color)) b.classList.add('selected');
+      });
+    }
+  }
 });

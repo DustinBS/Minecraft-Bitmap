@@ -31,8 +31,14 @@ def generate_image(width_blocks, height_blocks, choices, block_px=16):
     w = max(1, int(width_blocks))
     h = max(1, int(height_blocks))
     px = max(1, int(block_px))
-    img = Image.new("RGB", (w * px, h * px))
-    pixels = img.load()
+    
+    # 1. Generate the small application-grid image (1 user-block = 1 image-pixel)
+    # Using 'P' (palette) mode or just RGB. Since we are scaling up later,
+    # let's just make an RGB image of size (w, h) and resize it.
+    # This avoids the nested loops per pixel.
+    
+    small_img = Image.new("RGB", (w, h))
+    pixels = small_img.load()
 
     # Build cumulative distribution
     labels, weights = zip(*choices)
@@ -40,30 +46,32 @@ def generate_image(width_blocks, height_blocks, choices, block_px=16):
     if total == 0:
         weights = [1 for _ in weights]
         total = sum(weights)
-    probs = [w / total for w in weights]
-    cum = []
-    s = 0.0
-    for p in probs:
-        s += p
-        cum.append(s)
-
-    def pick_index():
-        r = random.random()
-        for i, c in enumerate(cum):
-            if r <= c:
-                return i
-        return len(cum) - 1
-
+    
+    # Using random.choices is much faster than manual cumulative sum loop in python
+    # random.choices(population, weights=None, *, cum_weights=None, k=1)
+    # available in Python 3.6+
+    
+    # We need w*h total choices
+    total_pixels = w * h
+    
+    # Generate all pixel choices at once
+    chosen_labels = random.choices(labels, weights=weights, k=total_pixels)
+    
     grid_names = [[None] * w for _ in range(h)]
-    for by in range(h):
-        for bx in range(w):
-            idx = pick_index()
-            name = labels[idx]
-            color = PALETTE.get(name, (255, 0, 255))
-            grid_names[by][bx] = name
-            for y in range(by * px, (by + 1) * px):
-                for x in range(bx * px, (bx + 1) * px):
-                    pixels[x, y] = color
+    
+    # Fill the small image
+    idx = 0
+    for y in range(h):
+        for x in range(w):
+            name = chosen_labels[idx]
+            grid_names[y][x] = name
+            pixels[x, y] = PALETTE.get(name, (255, 0, 255))
+            idx += 1
+
+    # 2. Scale up efficiently using Nearest Neighbor
+    # This replaces the nested loops that drew px*px rectangles for every block
+    final_w, final_h = w * px, h * px
+    img = small_img.resize((final_w, final_h), resample=Image.Resampling.NEAREST)
 
     buffer = BytesIO()
     img.save(buffer, format="PNG")
@@ -92,6 +100,13 @@ def index():
         if cname and w > 0:
             choices.append((cname, w))
 
+    # Capture subset selection from form (comma-separated values)
+    subset_raw = request.form.get("subset", "")
+    if subset_raw:
+        subset_selected = [s for s in subset_raw.split(",") if s]
+    else:
+        subset_selected = []
+
     if not choices:
         # Provide a simple default distribution
         choices = [("pink", 20), ("magenta", 40), ("purple", 40)]
@@ -114,7 +129,9 @@ def index():
         width=width,
         height=height,
         block_px=block_px,
-        choices=unique_choices, # Use unique aggregated choices for display
+        slot_choices=choices,       # per-slot choices (preserve order for form fields)
+        legend_choices=unique_choices, # aggregated unique choices for legend display
+        subset_selected=subset_selected,
         grid=grid,
     )
 
