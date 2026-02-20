@@ -64,7 +64,10 @@ document.addEventListener('DOMContentLoaded', () => {
       }
 
       if (auto) {
-        input.value    = v ? counts[v] : 0;
+        // When auto-weighting we want each selected slot to contribute
+        // one unit of weight so that the aggregated legend total equals
+        // the number of slots using that color (e.g. 2 slots -> total 2).
+        input.value    = v ? 1 : 0;
         input.readOnly = true;
       } else {
         input.readOnly = false;
@@ -105,23 +108,12 @@ document.addEventListener('DOMContentLoaded', () => {
       previewImg.src = `data:image/png;base64,${data.img_b64}`;
 
       // Rebuild legend
-      legendList.innerHTML = '';
-      (data.legend || []).forEach(({ name, weight, rgb }) => {
-        const li = document.createElement('li');
-        li.title = `Total Weight: ${weight}`;
-        if (rgb) {
-          const swatch = document.createElement('span');
-          swatch.className = 'swatch';
-          swatch.style.background = `rgb(${rgb[0]}, ${rgb[1]}, ${rgb[2]})`;
-          li.appendChild(swatch);
-        }
-        li.appendChild(document.createTextNode(` ${name} `));
-        const span = document.createElement('span');
-        span.className = 'legend-weight';
-        span.textContent = `(${weight})`;
-        li.appendChild(span);
-        legendList.appendChild(li);
-      });
+      renderLegend(data.legend);
+
+      // Add to History
+      // Capture the current form state *before* it changes (or after?)
+      // Actually we want to save the state that *produced* this result.
+      addToHistory(data.img_b64, data.legend || [], choices);
     } catch (err) {
       console.error('Generate failed:', err);
     } finally {
@@ -167,6 +159,120 @@ document.addEventListener('DOMContentLoaded', () => {
       recalc();
     });
   }
+
+
+  const historyStack = [];
+  const MAX_HISTORY = 5;
+  const historyGallery = document.querySelector('.history-gallery');
+  const historyEmpty = document.querySelector('.history-empty');
+
+  // Helper to render HTML legend
+  const renderLegend = (legendData) => {
+      legendList.innerHTML = '';
+      (legendData || []).forEach(({ name, weight, rgb }) => {
+        const li = document.createElement('li');
+        li.title = `Total Weight: ${weight}`;
+        if (rgb) {
+          const swatch = document.createElement('span');
+          swatch.className = 'swatch';
+          swatch.style.background = `rgb(${rgb[0]}, ${rgb[1]}, ${rgb[2]})`;
+          li.appendChild(swatch);
+        }
+        li.appendChild(document.createTextNode(` ${name} `));
+        const span = document.createElement('span');
+        span.className = 'legend-weight';
+        span.textContent = `(${weight})`;
+        li.appendChild(span);
+        legendList.appendChild(li);
+      });
+  };
+
+  const renderHistory = () => {
+      if (!historyGallery) return;
+      
+      historyGallery.innerHTML = '';
+      if (historyStack.length === 0) {
+          if (historyEmpty) historyEmpty.style.display = 'block';
+          return;
+      }
+      
+      if (historyEmpty) historyEmpty.style.display = 'none';
+
+      historyStack.forEach((state, index) => {
+          const item = document.createElement('div');
+          item.className = 'history-item';
+          item.title = `Restored from ${state.timestamp}`;
+          
+          const img = document.createElement('img');
+          img.src = `data:image/png;base64,${state.imgB64}`;
+          
+          item.appendChild(img);
+          item.addEventListener('click', () => {
+              restoreState(state);
+              // Highlight active
+              document.querySelectorAll('.history-item').forEach(el => el.classList.remove('active'));
+              item.classList.add('active');
+          });
+          
+          historyGallery.appendChild(item);
+      });
+  };
+
+  const addToHistory = (imgB64, legend, choices) => {
+      // 1. Unshift new state to front of array
+      const state = {
+          id: Date.now(),
+          imgB64,
+          legend,
+          choices,       // Current slot choices: [[name, weight], ...]
+          timestamp: new Date().toLocaleTimeString()
+      };
+      
+      historyStack.unshift(state);
+      if (historyStack.length > MAX_HISTORY) historyStack.pop();
+      renderHistory();
+      
+      // Auto-highlight first item
+      const first = historyGallery.firstElementChild;
+      if (first) first.classList.add('active');
+  };
+
+  const restoreState = (state) => {
+      // 1. Restore Image
+      previewImg.src = `data:image/png;base64,${state.imgB64}`;
+      
+      // 2. Restore Legend
+      renderLegend(state.legend);
+
+      // 3. Restore Slots/Form
+      const slots = getSlots();
+      
+      // Clear all first
+      slots.forEach(row => {
+          row.querySelector('.slot-select').value = '';
+          row.querySelector('.weight').value = 0;
+      });
+
+      // Fill from state choices
+      // state.choices is likely [[name, weight], ...]  representing filled slots
+      // Since our input format for generation was slightly filtered, we need to map carefully.
+      // But actually, we just need to fill slots sequentially for now.
+      
+      (state.choices || []).forEach((choice, idx) => {
+          if (idx < slots.length) {
+             const [name, w] = choice;
+             const row = slots[idx];
+             const sel = row.querySelector('.slot-select');
+             const wei = row.querySelector('.weight');
+             
+             sel.value = name;
+             wei.value = w;
+          }
+      });
+      
+      // Update UI styles
+      recalc();
+  };
 
   /* ── Randomize helper (shared by hotbar & subset) ───────── */
   const randomizeHotbar = (colorsArr) => {

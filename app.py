@@ -108,8 +108,13 @@ def index():
         subset_selected = []
 
     if not choices:
-        # Provide a simple default distribution
-        choices = [("pink", 20), ("magenta", 40), ("purple", 40)]
+        # Provide a simple default distribution (2 pink, 4 magenta, 3 purple)
+        # Weights are just counts of slots basically
+        choices = [
+            ("pink", 1), ("pink", 1),
+            ("magenta", 1), ("magenta", 1), ("magenta", 1), ("magenta", 1),
+            ("purple", 1), ("purple", 1), ("purple", 1)
+        ]
 
     # Calculate unique choices for the legend display
     unique_choices_map = {}

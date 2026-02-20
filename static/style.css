@@ -625,3 +625,233 @@ main {
   box-shadow: 0 1px 0 rgba(0, 0, 0, 0.06);
   margin-right: 4px;
 }
+
+/* -- Preview Actions / Generate Button ------------------------ */
+.preview-actions {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.generate-primary {
+  background: var(--accent);
+  color: #fff;
+  font-weight: 600;
+  font-size: 14px;
+  padding: 10px 22px;
+  border-radius: var(--radius);
+  border: none;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background var(--transition), box-shadow var(--transition), transform var(--transition);
+  position: relative;
+}
+
+.generate-primary:hover {
+  background: var(--accent-hover);
+  box-shadow: 0 4px 20px var(--accent-glow);
+  transform: translateY(-1px);
+}
+
+.generate-primary:active {
+  transform: translateY(0);
+  box-shadow: 0 2px 8px var(--accent-glow);
+}
+
+/* Generate button loading state */
+.generate-primary.loading {
+  color: transparent;
+  pointer-events: none;
+}
+
+.generate-primary.loading::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 18px;
+  height: 18px;
+  margin: -9px 0 0 -9px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: spin 0.6s linear infinite;
+}
+
+/* -- Hint ----------------------------------------------------- */
+.hint {
+  color: var(--text-muted);
+  font-size: 12px;
+  margin-left: 10px;
+  align-self: center;
+}
+
+/* -- Preview Canvas ------------------------------------------- */
+.preview {
+  flex: 1;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: auto;
+  position: relative;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+
+.preview img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
+
+/* Preview loading overlay */
+.preview.loading::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: rgba(255, 255, 255, 0.75);
+  backdrop-filter: blur(2px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10;
+}
+
+.preview.loading::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 32px;
+  height: 32px;
+  margin: -16px 0 0 -16px;
+  border: 3px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+  z-index: 11;
+}
+
+/* -- Spinner Keyframes ---------------------------------------- */
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* -- Scrollbar - Preview Area --------------------------------- */
+.preview::-webkit-scrollbar { width: 6px; height: 6px; }
+.preview::-webkit-scrollbar-track { background: transparent; }
+.preview::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.1);
+  border-radius: 3px;
+}
+.preview::-webkit-scrollbar-thumb:hover { background: rgba(0, 0, 0, 0.18); }
+
+/* -- Slot Controls Row ---------------------------------------- */
+.slot-controls {
+  margin-bottom: var(--space-sm);
+  display: flex;
+  gap: var(--space-sm);
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.slot-controls label {
+  margin-right: 6px;
+}
+
+/* -- Randomize Controls --------------------------------------- */
+.randomize-controls {
+  padding: 10px 0;
+  border-top: 1px dashed var(--sidebar-border);
+  margin-top: 10px;
+}
+
+.randomize-header {
+  display: flex;
+  gap: var(--space-sm);
+  align-items: center;
+  margin-bottom: var(--space-sm);
+}
+
+.hotkey-hint {
+  color: var(--sidebar-muted);
+  font-size: 13px;
+}
+
+.subset-label-text {
+  font-size: 13px;
+  color: var(--sidebar-muted);
+  margin-bottom: 6px;
+}
+
+/* -- History Gallery ------------------------------------------ */
+.history-container {
+  margin-top: var(--space-md);
+  padding-top: var(--space-md);
+  border-top: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.history-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.history-title {
+  font-size: 13px;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin: 0;
+}
+
+.history-gallery {
+  display: flex;
+  gap: var(--space-sm);
+  overflow-x: auto;
+  padding-bottom: 4px; /* Space for scrollbar */
+  padding-top: 6px; /* allow hover lift without overlapping header */
+  scrollbar-width: thin;
+}
+
+.history-item {
+  flex: 0 0 100px;
+  height: 60px;
+  border-radius: var(--radius-sm);
+  border: 2px solid transparent;
+  cursor: pointer;
+  overflow: hidden;
+  position: relative;
+  transition: var(--transition);
+  background: #e2e8f0;
+}
+
+.history-item:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 18px rgba(0,0,0,0.12);
+  z-index: 5; /* lift above siblings to avoid clipping/overlap */
+}
+
+.history-item.active {
+  border-color: var(--accent);
+  z-index: 6;
+}
+
+.history-item img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  image-rendering: pixelated;
+}
+
+.history-empty {
+  font-size: 13px;
+  color: var(--text-muted);
+  font-style: italic;
+}
