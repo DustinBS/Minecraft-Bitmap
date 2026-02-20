@@ -115,12 +115,19 @@
           <span><kbd>G</kbd> Generate</span>
           <span><kbd>R</kbd> Randomize</span>
           <span><kbd>S</kbd> Subset</span>
+          <span><kbd>P</kbd> Pin</span>
         </div>
 
         <div class="history-container">
           <div class="history-header">
-            <h3 class="history-title">History</h3>
-            <span class="history-empty" id="historyEmpty">No previous patterns</span>
+            <div class="history-tabs">
+              <button type="button" id="tabHistory" class="tab active">History</button>
+              <button type="button" id="tabPinned" class="tab">Pinned</button>
+            </div>
+            <div class="history-status">
+              <span class="history-empty" id="historyEmpty">No previous patterns</span>
+              <span class="history-empty" id="pinnedEmpty" style="display:none">No pinned patterns</span>
+            </div>
           </div>
           <div class="history-gallery" id="historyGallery">
             <!-- Thumbnails injected here -->

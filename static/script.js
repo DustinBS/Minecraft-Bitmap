@@ -162,9 +162,124 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
   const historyStack = [];
+  const pinnedStack = [];
   const MAX_HISTORY = 20;
+  const MAX_PINNED = 20;
   const historyGallery = document.querySelector('.history-gallery');
-  const historyEmpty = document.querySelector('.history-empty');
+  const historyEmpty = document.getElementById('historyEmpty');
+  const pinnedEmpty = document.getElementById('pinnedEmpty');
+  const tabHistoryBtn = document.getElementById('tabHistory');
+  const tabPinnedBtn = document.getElementById('tabPinned');
+  let activeTab = 'history';
+  let currentActiveId = null;
+
+  // --- Persistence -------------------------------------------
+  const STORAGE_KEYS = {
+    HISTORY: 'mc_bitmap_history',
+    PINNED: 'mc_bitmap_pinned',
+    FORM: 'mc_bitmap_form',
+    CURRENT: 'mc_bitmap_current'
+  };
+
+  const saveState = () => {
+    try {
+      localStorage.setItem(STORAGE_KEYS.HISTORY, JSON.stringify(historyStack));
+      localStorage.setItem(STORAGE_KEYS.PINNED, JSON.stringify(pinnedStack));
+      localStorage.setItem(STORAGE_KEYS.CURRENT, currentActiveId ? String(currentActiveId) : '');
+
+      const formState = {
+        slots: getSlots().map(row => ({
+          color: row.querySelector('.slot-select').value,
+          weight: row.querySelector('.weight').value
+        })),
+        autoWeights: autoCheckbox.checked,
+        width: document.querySelector('[name="width"]').value,
+        height: document.querySelector('[name="height"]').value,
+        block_px: document.querySelector('[name="block_px"]').value,
+        subset: Array.from(document.querySelectorAll('.subset-color.selected')).map(b => b.dataset.color)
+      };
+      localStorage.setItem(STORAGE_KEYS.FORM, JSON.stringify(formState));
+    } catch (e) {
+      console.warn('Failed to save state to localStorage:', e);
+    }
+  };
+
+  const loadState = () => {
+    try {
+      // Load History
+      const savedHistory = JSON.parse(localStorage.getItem(STORAGE_KEYS.HISTORY));
+      if (Array.isArray(savedHistory)) {
+        historyStack.length = 0; // Clear
+        savedHistory.slice(0, MAX_HISTORY).forEach(item => historyStack.push(item));
+      }
+
+      // Load Pinned
+      const savedPinned = JSON.parse(localStorage.getItem(STORAGE_KEYS.PINNED));
+      if (Array.isArray(savedPinned)) {
+        pinnedStack.length = 0; // Clear
+        savedPinned.forEach(item => pinnedStack.push(item));
+      }
+
+      // Load Form
+      const savedForm = JSON.parse(localStorage.getItem(STORAGE_KEYS.FORM));
+      if (savedForm) {
+        // Slots
+        const slots = getSlots();
+        if (Array.isArray(savedForm.slots)) {
+          savedForm.slots.forEach((s, i) => {
+            if (i < slots.length) {
+              slots[i].querySelector('.slot-select').value = s.color || '';
+              slots[i].querySelector('.weight').value = s.weight || 0;
+            }
+          });
+        }
+
+        // Settings
+        if (savedForm.autoWeights !== undefined) autoCheckbox.checked = savedForm.autoWeights;
+        if (savedForm.width) document.querySelector('[name="width"]').value = savedForm.width;
+        if (savedForm.height) document.querySelector('[name="height"]').value = savedForm.height;
+        if (savedForm.block_px) document.querySelector('[name="block_px"]').value = savedForm.block_px;
+
+        // Subset
+        if (Array.isArray(savedForm.subset)) {
+          document.querySelectorAll('.subset-color').forEach(b => {
+             if (savedForm.subset.includes(b.dataset.color)) b.classList.add('selected');
+             else b.classList.remove('selected');
+          });
+        }
+      }
+      
+      renderGallery(activeTab === 'history' ? historyStack : pinnedStack);
+      // If we have a saved "current" id, restore that pattern; otherwise
+      // prefer the most recent history item if present. This ensures the
+      // preview, legend, and hotbar match the selected pattern after reload.
+      const savedCurrent = localStorage.getItem(STORAGE_KEYS.CURRENT);
+      if (savedCurrent) {
+        const id = String(savedCurrent);
+        let found = historyStack.find(h => String(h.id) === id) || pinnedStack.find(p => String(p.id) === id);
+        if (found) {
+          currentActiveId = found.id;
+          // mark active in gallery (renderGallery already created items)
+          const el = historyGallery?.querySelector(`.history-item[data-id="${found.id}"]`);
+          if (el) el.classList.add('active');
+          restoreState(found);
+          recalc();
+          return;
+        }
+      }
+
+      // No saved current: if we have a recent history entry, restore that
+      if (historyStack.length > 0) {
+        currentActiveId = historyStack[0].id;
+        const first = historyGallery.firstElementChild;
+        if (first) first.classList.add('active');
+        restoreState(historyStack[0]);
+      }
+      recalc();
+    } catch (e) {
+      console.warn('Failed to load state from localStorage:', e);
+    }
+  };
 
   // Helper to render HTML legend
   const renderLegend = (legendData) => {
@@ -187,36 +302,61 @@ document.addEventListener('DOMContentLoaded', () => {
       });
   };
 
-  const renderHistory = () => {
+    const renderGallery = (list) => {
       if (!historyGallery) return;
-      
       historyGallery.innerHTML = '';
-      if (historyStack.length === 0) {
-          if (historyEmpty) historyEmpty.style.display = 'block';
-          return;
-      }
-      
-      if (historyEmpty) historyEmpty.style.display = 'none';
 
-      historyStack.forEach((state, index) => {
-          const item = document.createElement('div');
-          item.className = 'history-item';
-          item.title = `Restored from ${state.timestamp}`;
-          
-          const img = document.createElement('img');
-          img.src = `data:image/png;base64,${state.imgB64}`;
-          
-          item.appendChild(img);
-          item.addEventListener('click', () => {
-              restoreState(state);
-              // Highlight active
-              document.querySelectorAll('.history-item').forEach(el => el.classList.remove('active'));
-              item.classList.add('active');
-          });
-          
-          historyGallery.appendChild(item);
+      const isHistory = (activeTab === 'history');
+      if (isHistory) {
+      if (historyStack.length === 0) { if (historyEmpty) historyEmpty.style.display = 'block'; }
+      else if (historyEmpty) historyEmpty.style.display = 'none';
+      if (pinnedEmpty) pinnedEmpty.style.display = 'none';
+      } else {
+      if (pinnedStack.length === 0) { if (pinnedEmpty) pinnedEmpty.style.display = 'block'; }
+      else if (pinnedEmpty) pinnedEmpty.style.display = 'none';
+      if (historyEmpty) historyEmpty.style.display = 'none';
+      }
+
+      list.forEach((state, index) => {
+        const item = document.createElement('div');
+        item.className = 'history-item';
+        
+        // Check if pinned
+        const isPinned = pinnedStack.some(p => p.id === state.id);
+        if (isPinned) item.classList.add('pinned');
+
+        item.dataset.id = state.id;
+        // mark active if it matches persisted active id
+        if (currentActiveId && String(state.id) === String(currentActiveId)) item.classList.add('active');
+        item.title = `Restored from ${state.timestamp}`;
+
+        const img = document.createElement('img');
+        img.src = `data:image/png;base64,${state.imgB64}`;
+        item.appendChild(img);
+
+        // Pin button
+        const pinBtn = document.createElement('button');
+        pinBtn.className = 'pin-btn';
+        pinBtn.title = isPinned ? 'Unpin' : 'Pin';
+        pinBtn.innerHTML = '📌'; // using innerHTML to ensure char renders
+        pinBtn.addEventListener('click', (ev) => {
+          ev.stopPropagation();
+          togglePin(state);
+        });
+        item.appendChild(pinBtn);
+
+        item.addEventListener('click', () => {
+          // set current active id and persist
+          currentActiveId = state.id;
+          saveState();
+          restoreState(state);
+          document.querySelectorAll('.history-item').forEach(el => el.classList.remove('active'));
+          item.classList.add('active');
+        });
+
+        historyGallery.appendChild(item);
       });
-  };
+    };
 
   const addToHistory = (imgB64, legend, choices) => {
       // 1. Unshift new state to front of array
@@ -230,11 +370,14 @@ document.addEventListener('DOMContentLoaded', () => {
       
       historyStack.unshift(state);
       if (historyStack.length > MAX_HISTORY) historyStack.pop();
-      renderHistory();
+      // mark this as the currently active pattern and persist
+      currentActiveId = state.id;
+      saveState(); // SAVE
+      if (activeTab === 'history') renderGallery(historyStack);
       
       // Auto-highlight first item
-      const first = historyGallery.firstElementChild;
-      if (first) first.classList.add('active');
+        const first = historyGallery.firstElementChild;
+        if (first) first.classList.add('active');
   };
 
   const restoreState = (state) => {
@@ -273,6 +416,34 @@ document.addEventListener('DOMContentLoaded', () => {
       // Update UI styles
       recalc();
   };
+
+  const togglePin = (state) => {
+      const existingIdx = pinnedStack.findIndex(p => p.id === state.id);
+      if (existingIdx >= 0) {
+        // unpin
+        pinnedStack.splice(existingIdx, 1);
+      } else {
+        pinnedStack.unshift(state);
+        if (pinnedStack.length > MAX_PINNED) pinnedStack.pop();
+      }
+      saveState(); // SAVE
+      renderGallery(activeTab === 'history' ? historyStack : pinnedStack);
+  };
+
+  // Tab handling
+  const setActiveTab = (tab) => {
+    activeTab = tab;
+    if (tab === 'history') {
+      tabHistoryBtn.classList.add('active'); tabPinnedBtn.classList.remove('active');
+      renderGallery(historyStack);
+    } else {
+      tabPinnedBtn.classList.add('active'); tabHistoryBtn.classList.remove('active');
+      renderGallery(pinnedStack);
+    }
+  };
+
+  if (tabHistoryBtn) tabHistoryBtn.addEventListener('click', () => setActiveTab('history'));
+  if (tabPinnedBtn) tabPinnedBtn.addEventListener('click', () => setActiveTab('pinned'));
 
   /* ── Randomize helper (shared by hotbar & subset) ───────── */
   const randomizeHotbar = (colorsArr) => {
@@ -343,9 +514,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
   /* ── Select-change & auto-weight checkbox listeners ─────── */
   document.querySelectorAll('.slot-select').forEach(s =>
-    s.addEventListener('change', recalc)
+    s.addEventListener('change', () => { recalc(); saveState(); })
   );
-  if (autoCheckbox) autoCheckbox.addEventListener('change', recalc);
+  document.querySelectorAll('.weight').forEach(w => 
+    w.addEventListener('input', () => { saveState(); })
+  );
+  if (autoCheckbox) autoCheckbox.addEventListener('change', () => { recalc(); saveState(); });
 
   /* ── Generate button click ──────────────────────────────── */
   if (genBtn) genBtn.addEventListener('click', generatePreview);
@@ -361,8 +535,23 @@ document.addEventListener('DOMContentLoaded', () => {
     if (key === 'G') { e.preventDefault(); generatePreview(); }
     if (key === 'R') { e.preventDefault(); randBtn?.click(); }
     if (key === 'S') { e.preventDefault(); randSubsetBtn?.click(); }
+    if (key === 'P') {
+      e.preventDefault();
+      // Pin/unpin currently active history item (if any) or latest history
+      const active = document.querySelector('.history-item.active');
+      if (active) {
+        const id = active.dataset.id;
+        const state = activeTab === 'history' 
+          ? historyStack.find(h => String(h.id) === String(id))
+          : pinnedStack.find(p => String(p.id) === String(id));
+        if (state) { togglePin(state); }
+      } else if (historyStack.length > 0 && activeTab === 'history') {
+        togglePin(historyStack[0]);
+      }
+    }
   });
 
-  /* ── Initial recalc ─────────────────────────────────────── */
+  /* ── Initial Load & Recalc ──────────────────────────────── */
+  loadState();
   recalc();
 });

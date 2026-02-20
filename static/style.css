@@ -850,6 +850,44 @@ main {
   image-rendering: pixelated;
 }
 
+/* Pin button overlay */
+.pin-btn {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 26px;
+  height: 26px;
+  border-radius: 6px;
+  border: none;
+  background: rgba(255,255,255,0.9);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.06);
+  opacity: 0;
+  transition: opacity 0.2s, background 0.2s;
+}
+
+.history-item:hover .pin-btn,
+.history-item.pinned .pin-btn {
+  opacity: 1;
+}
+
+.history-item.pinned .pin-btn {
+  background: var(--accent);
+  color: white;
+}
+
+.pin-btn:hover { background: var(--accent); color: #fff; }
+
+/* Tabs */
+.history-tabs { display: flex; gap: 8px; }
+.tab { background: transparent; border: 1px solid transparent; padding: 6px 10px; border-radius: 6px; cursor: pointer; font-weight:600; }
+.tab.active { background: var(--surface); border-color: var(--border); }
+
+
 .history-empty {
   font-size: 13px;
   color: var(--text-muted);
