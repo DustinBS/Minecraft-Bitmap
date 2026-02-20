@@ -162,7 +162,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
   const historyStack = [];
-  const MAX_HISTORY = 5;
+  const MAX_HISTORY = 20;
   const historyGallery = document.querySelector('.history-gallery');
   const historyEmpty = document.querySelector('.history-empty');
 
