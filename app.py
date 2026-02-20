@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request
+from flask import Flask, render_template, request, jsonify
 from io import BytesIO
 from PIL import Image
 import base64
@@ -134,6 +134,40 @@ def index():
         subset_selected=subset_selected,
         grid=grid,
     )
+
+
+@app.route("/generate", methods=["POST"])
+def generate():
+    data = request.get_json(force=True)
+
+    raw_choices = data.get("choices", [])
+    width = data.get("width", 32)
+    height = data.get("height", 16)
+    block_px = data.get("block_px", 12)
+
+    choices = []
+    for item in raw_choices:
+        if isinstance(item, (list, tuple)) and len(item) == 2:
+            name, weight = item
+            if name in PALETTE and float(weight) > 0:
+                choices.append((name, float(weight)))
+
+    if not choices:
+        return jsonify({"error": "No valid choices provided"}), 400
+
+    unique_choices_map = {}
+    for c, w in choices:
+        unique_choices_map[c] = unique_choices_map.get(c, 0) + w
+    unique_choices = sorted(unique_choices_map.items(), key=lambda x: x[1], reverse=True)
+
+    img_b64, grid = generate_image(int(width), int(height), choices, block_px=int(block_px))
+
+    legend = [
+        {"name": name, "weight": w, "rgb": list(PALETTE[name])}
+        for name, w in unique_choices
+    ]
+
+    return jsonify({"img_b64": img_b64, "legend": legend})
 
 
 if __name__ == "__main__":

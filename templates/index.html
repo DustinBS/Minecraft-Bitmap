@@ -12,7 +12,7 @@
         <h1>Carpet Pattern Visualizer</h1>
         <form id="settingsForm" method="post">
           <section class="palette-list top">
-            <h3>Available colors</h3>
+            <h3>Available colors (Click to Add)</h3>
             <div class="palette-grid">
               {% for c in palette %}
                 {% set rgb = palette_map.get(c) %}
@@ -25,15 +25,14 @@
           </section>
 
           <section class="slots">
-              <h2>Hotbar Slots</h2>
-              <div style="margin-bottom:8px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-                <label style="margin-right:6px" title="Automatically sets the weight based on how many slots have the same color">
-                  <input id="autoWeights" type="checkbox" checked> Auto-calculate weights
-                </label>
-                <!-- Sync button removed as it was redundant/confusing -->
-                <button type="button" id="clearAll" class="small" title="Reset all slots to empty">Clear all</button>
-              </div>
-              <div class="slots-scroll">
+            <h2>Hotbar Slots</h2>
+            <div class="slot-controls">
+              <label title="Automatically sets the weight based on how many slots have the same color">
+                <input id="autoWeights" type="checkbox" checked> Auto-calculate weights
+              </label>
+              <button type="button" id="clearAll" class="small" title="Reset all slots to empty">Clear all</button>
+            </div>
+            <div class="slots-scroll">
               {% for i in range(1, slots+1) %}
                 <div class="slot-row" data-slot="{{i}}">
                   <select name="color_{{i}}" class="slot-select">
@@ -50,18 +49,16 @@
                   <button type="button" class="remove small">Remove</button>
                 </div>
               {% endfor %}
-              </div>
-
+            </div>
           </section>
 
-          <!-- Randomize controls placed after hotbar -->
-          <div class="randomize-controls" style="padding:10px 0;border-top:1px dashed #eee;margin-top:10px">
-            <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px">
+          <div class="randomize-controls">
+            <div class="randomize-header">
               <button type="button" id="randHotbar" class="small" title="Randomize hotbar (R)">Randomize (R)</button>
               <button type="button" id="randSubset" class="small" title="Randomize subset (S)">Randomize Subset (S)</button>
-              <span style="color:#6b7280;font-size:13px">Hotkeys: R/S</span>
+              <span class="hotkey-hint">Hotkeys: R/S</span>
             </div>
-            <div style="font-size:13px;color:#374151;margin-bottom:6px">Pick subset for Randomize Subset (S):</div>
+            <div class="subset-label-text">Pick subset for Randomize Subset (S):</div>
             <div class="subset-grid">
               {% for c in palette %}
                 {% set rgb = palette_map.get(c) %}
@@ -70,49 +67,54 @@
                 </button>
               {% endfor %}
             </div>
-            <!-- hidden subset input persists selection across submits -->
             <input type="hidden" name="subset" id="subsetInput" value="{{ subset_selected|join(',') if subset_selected else '' }}">
           </div>
 
-          <!-- Grid/Size settings moved to bottom -->
-          <div class="grid-settings bottom" style="margin-top:auto;border-top:1px solid #e6e6e6;padding-top:12px">
-            <h3 style="font-size:14px;margin:0 0 8px 0;color:#555">Dimensions</h3>
+          <div class="grid-settings bottom">
+            <h3 class="dimensions-heading">Dimensions</h3>
             <label>Width (blocks): <input name="width" value="{{width}}"></label>
             <label>Height (blocks): <input name="height" value="{{height}}"></label>
             <label>Pixels per block: <input name="block_px" value="{{block_px}}"></label>
           </div>
-            </section>
-
         </form>
       </aside>
 
       <section class="preview-area">
         <div class="output-header">
           <div class="legend">
-            <h3 style="margin:0 0 8px 0;font-size:16px;">Unique Colors Used</h3>
-            <ul>
+            <h3 class="legend-heading">
+              Unique Colors Used 
+              <span class="help-icon" title="The number in parentheses represents the total weight assigned to that color across all input slots.">(?)</span>
+            </h3>
+            <ul id="legendList">
               {% for name, w in legend_choices %}
                 {% set rgb = palette_map.get(name) %}
                 {% if rgb %}
-                  <li title="Weight: {{w}}">
+                  <li title="Total Weight: {{w}}">
                     <span class="swatch" style="background: rgb({{rgb[0]}}, {{rgb[1]}}, {{rgb[2]}})"></span>
                     {{name}}
-                    <span style="opacity:0.6;font-size:0.9em">({{w|int}})</span>
+                    <span class="legend-weight">({{w|int}})</span>
                   </li>
                 {% else %}
-                  <li>{{name}} ({{w|int}})</li>
+                  <li title="Total Weight: {{w}}">{{name}} ({{w|int}})</li>
                 {% endif %}
               {% endfor %}
             </ul>
           </div>
+          <h2 class="preview-title">Pattern Preview</h2>
           <div class="preview-actions">
-            <button type="submit" form="settingsForm" class="generate-primary" title="Generate new pattern">Generate Preview</button>
-            <span class="hint" aria-hidden="true">Press Enter</span>
+            <button type="button" id="generateBtn" class="generate-primary" title="Generate new pattern (G)">Generate Preview (G)</button>
           </div>
         </div>
 
-        <div class="preview">
-          <img src="data:image/png;base64,{{img_b64}}" alt="preview">
+        <div class="preview" id="previewContainer">
+          <img id="previewImg" src="data:image/png;base64,{{img_b64}}" alt="preview">
+        </div>
+
+        <div class="shortcuts-bar">
+          <span><kbd>G</kbd> Generate</span>
+          <span><kbd>R</kbd> Randomize</span>
+          <span><kbd>S</kbd> Subset</span>
         </div>
       </section>
     </main>
