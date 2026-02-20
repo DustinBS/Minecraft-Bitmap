@@ -55,20 +55,37 @@
           <div class="randomize-controls">
             <div class="randomize-header">
               <button type="button" id="randHotbar" class="small" title="Randomize hotbar (R)">Randomize (R)</button>
-              <button type="button" id="randSubset" class="small" title="Randomize subset (S)">Randomize Subset (S)</button>
-              <span class="hotkey-hint">Hotkeys: R/S</span>
+              <button type="button" id="randSubset" class="small" title="Randomize weights within the subset of selected colors filling 2 to 9 hotbar slots (S)">Randomize Subset (S)</button>
             </div>
-            <div class="subset-label-text">Pick subset for Randomize Subset (S):</div>
+            
+            <div class="subset-label-text">
+              Pick subset for Randomize Subset (S):
+              <br>
+              <small>Left-click to add/remove from pool
+                <button type="button" id="clearSubset" class="ghost-link" title="Clear all subset selections">Clear Subset</button>
+                <br>Shift+Click to lock (always include).
+                <button type="button" id="clearLocks" class="ghost-link" title="Clear all locks">Clear Locks</button>
+              </small>
+            </div>
+            <div id="subsetWarning" class="subset-warning" style="display:none">Too many locks — remove one (max 9)</div>
             <div class="subset-grid">
               {% for c in palette %}
                 {% set rgb = palette_map.get(c) %}
-                <button type="button" class="subset-color {% if subset_selected and c in subset_selected %}selected{% endif %}" data-color="{{c}}" title="Toggle {{c}}">
+                <button type="button" class="subset-color {% if subset_selected and c in subset_selected %}selected{% endif %} {% if locked_selected and c in locked_selected %}locked{% endif %}" 
+                  data-color="{{c}}" title="Left-Click: Toggle Selection | Shift+Click: Toggle Lock (Always Include)">
                   <span class="swatch" style="background: rgb({{rgb[0]}}, {{rgb[1]}}, {{rgb[2]}})"></span>
+                  <span class="lock-icon">🔒</span>
                 </button>
               {% endfor %}
             </div>
             <input type="hidden" name="subset" id="subsetInput" value="{{ subset_selected|join(',') if subset_selected else '' }}">
+            <input type="hidden" name="locked" id="lockedInput" value="{{ locked_selected|join(',') if locked_selected else '' }}">
           </div>
+
+        <div class="subset-tools">
+            <button type="button" id="useCurrentSubset" class="small" title="Set subset to colors currently in the hotbar (useful to randomize weights for this palette)">Use Current Pattern</button>
+        </div>
+
 
           <div class="grid-settings bottom">
             <h3 class="dimensions-heading">Dimensions</h3>

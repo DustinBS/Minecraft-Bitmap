@@ -111,8 +111,7 @@ document.addEventListener('DOMContentLoaded', () => {
       renderLegend(data.legend);
 
       // Add to History
-      // Capture the current form state *before* it changes (or after?)
-      // Actually we want to save the state that *produced* this result.
+      // Save the state that produced this result.
       addToHistory(data.img_b64, data.legend || [], choices);
     } catch (err) {
       console.error('Generate failed:', err);
@@ -124,7 +123,21 @@ document.addEventListener('DOMContentLoaded', () => {
 
   /* ── Add color click ────────────────────────────────────── */
   document.querySelectorAll('.add-color').forEach(b => {
-    b.addEventListener('click', () => {
+    // Toggle lock on Shift+Click only (avoid hijacking right-click)
+    const toggleLock = (e) => {
+      if (e.type === 'click' && e.shiftKey) {
+        e.preventDefault();
+        b.classList.toggle('locked');
+        saveState();
+        return true;
+      }
+      return false;
+    };
+
+    b.addEventListener('click', (e) => {
+      if (toggleLock(e)) return;
+      if (b.classList.contains('locked')) return;
+
       const empty = getSlots().find(s => s.querySelector('.slot-select').value === '');
       if (empty) {
         empty.querySelector('.slot-select').value = b.dataset.color;
@@ -196,7 +209,9 @@ document.addEventListener('DOMContentLoaded', () => {
         width: document.querySelector('[name="width"]').value,
         height: document.querySelector('[name="height"]').value,
         block_px: document.querySelector('[name="block_px"]').value,
-        subset: Array.from(document.querySelectorAll('.subset-color.selected')).map(b => b.dataset.color)
+        subset: Array.from(document.querySelectorAll('.subset-color.selected')).map(b => b.dataset.color),
+        lockedSubset: Array.from(document.querySelectorAll('.subset-color.locked')).map(b => b.dataset.color),
+        lockedAdd: Array.from(document.querySelectorAll('.add-color.locked')).map(b => b.dataset.color)
       };
       localStorage.setItem(STORAGE_KEYS.FORM, JSON.stringify(formState));
     } catch (e) {
@@ -245,7 +260,23 @@ document.addEventListener('DOMContentLoaded', () => {
           document.querySelectorAll('.subset-color').forEach(b => {
              if (savedForm.subset.includes(b.dataset.color)) b.classList.add('selected');
              else b.classList.remove('selected');
+             
+             if (Array.isArray(savedForm.lockedSubset) && savedForm.lockedSubset.includes(b.dataset.color)) {
+                b.classList.add('locked');
+             } else {
+                b.classList.remove('locked');
+             }
           });
+        }
+
+        if (Array.isArray(savedForm.lockedAdd)) {
+           document.querySelectorAll('.add-color').forEach(b => {
+              if (savedForm.lockedAdd.includes(b.dataset.color)) {
+                 b.classList.add('locked');
+              } else {
+                 b.classList.remove('locked');
+              }
+           });
         }
       }
       
@@ -397,9 +428,8 @@ document.addEventListener('DOMContentLoaded', () => {
       });
 
       // Fill from state choices
-      // state.choices is likely [[name, weight], ...]  representing filled slots
-      // Since our input format for generation was slightly filtered, we need to map carefully.
-      // But actually, we just need to fill slots sequentially for now.
+      // state.choices: [[name, weight], ...] representing filled slots.
+      // Fill slots sequentially.
       
       (state.choices || []).forEach((choice, idx) => {
           if (idx < slots.length) {
@@ -446,24 +476,59 @@ document.addEventListener('DOMContentLoaded', () => {
   if (tabPinnedBtn) tabPinnedBtn.addEventListener('click', () => setActiveTab('pinned'));
 
   /* ── Randomize helper (shared by hotbar & subset) ───────── */
-  const randomizeHotbar = (colorsArr) => {
+  const randomizeHotbar = (colorsArr, lockedArr = []) => {
     const slots = getSlots();
     const total = slots.length;
-    if (!colorsArr || colorsArr.length === 0) return;
 
+    // Validate:
+    // If lockedArr is provided, we MUST use them.
+    // Remaining slots = [2..total] - lockedArr.length. 
+    // If lockedArr.length >= total, we just fill up to total.
+    
+    if (lockedArr.length > total) {
+       alert(`You have locked ${lockedArr.length} colors but only ${total} slots available. Please unlock some.`);
+       return;
+    }
+    
+    // If we have no colors to pick from (and no locks), abort
+    if ((!colorsArr || colorsArr.length === 0) && lockedArr.length === 0) return;
+
+    // Keep 'colorsArr' as the random pool (allowing duplicates even if locked).
     const maxAttempts = 30;
     for (let attempt = 0; attempt < maxAttempts; attempt++) {
-      const n     = Math.floor(Math.random() * (total - 1)) + 2; // 2..total
-      const picks = Array.from({ length: n }, () =>
-        colorsArr[Math.floor(Math.random() * colorsArr.length)]
-      );
-      const allSame = picks.every(c => c === picks[0]);
+      // Determine total N slots to fill
+      // Min is at least locked.length
+      // If locked.length < 2, we try to go up to at least 2 if possible.
+      // Max is total.
+      
+      let minSlots = Math.max(2, lockedArr.length);
+      if (minSlots > total) minSlots = total;
+      
+      const n = Math.floor(Math.random() * (total - minSlots + 1)) + minSlots; 
+      
+      // Start with locked items
+      const picks = [...lockedArr];
+      
+      // Fill remainder
+      while (picks.length < n) {
+         if (colorsArr.length > 0) {
+            picks.push(colorsArr[Math.floor(Math.random() * colorsArr.length)]);
+         } else {
+            // No pool colors, just stop if we have enough locked
+            break;
+         }
+      }
 
-      if (!allSame || colorsArr.length === 1) {
+      // Check variety (unless only 1 color available total)
+      const allSame = picks.length > 1 && picks.every(c => c === picks[0]);
+      const poolSize = new Set([...colorsArr, ...lockedArr]).size;
+
+      if (!allSame || poolSize === 1) {
+        // Apply
         slots.forEach((row, idx) => {
           const sel = row.querySelector('.slot-select');
           const w   = row.querySelector('.weight');
-          sel.value = idx < n ? picks[idx] : '';
+          sel.value = idx < picks.length ? picks[idx] : '';
           w.value   = 0;
         });
         recalc();
@@ -471,7 +536,7 @@ document.addEventListener('DOMContentLoaded', () => {
         return;
       }
     }
-    alert('Could not generate a varied hotbar from the provided colors. Try a larger subset.');
+    alert('Could not generate a varied hotbar. Adjust your subset or locks.');
   };
 
   /* ── Randomize hotbar (all colours) ─────────────────────── */
@@ -484,24 +549,121 @@ document.addEventListener('DOMContentLoaded', () => {
     randSubsetBtn.addEventListener('click', () => {
       const chosen = Array.from(document.querySelectorAll('.subset-color.selected'))
                           .map(b => b.dataset.color);
-      if (chosen.length < 2) {
-        alert('Please select at least 2 colors for subset randomization.');
+      const locked = Array.from(document.querySelectorAll('.subset-color.locked'))
+                          .map(b => b.dataset.color);
+
+      // Verify that at least one item is available (either selected or locked).
+      
+      if (chosen.length === 0 && locked.length < 2) {
+        alert('Please select or lock at least 2 colors/slots for randomization.');
         return;
       }
-      randomizeHotbar(chosen);
+      randomizeHotbar(chosen, locked);
     });
   }
 
   /* ── Subset swatch toggle ───────────────────────────────── */
-  document.querySelectorAll('.subset-color').forEach(b => {
-    b.addEventListener('click', () => {
-      b.classList.toggle('selected');
+  const updateSubsetInput = () => {
       const selected = Array.from(document.querySelectorAll('.subset-color.selected'))
                             .map(x => x.dataset.color);
+      const locked = Array.from(document.querySelectorAll('.subset-color.locked'))
+                            .map(x => x.dataset.color);
+
       const subsetInput = document.getElementById('subsetInput');
+      const lockedInput = document.getElementById('lockedInput');
+      
       if (subsetInput) subsetInput.value = selected.join(',');
+      if (lockedInput) lockedInput.value = locked.join(',');
+      
+      saveState();
+      // update any warning about too many locks
+      updateLockWarning();
+  };
+
+  const subsetWarning = document.getElementById('subsetWarning');
+  const updateLockWarning = () => {
+    try {
+      const lockedCount = document.querySelectorAll('.subset-color.locked').length;
+      if (!subsetWarning) return;
+      if (lockedCount > 9) {
+        subsetWarning.style.display = 'block';
+        subsetWarning.textContent = `Too many locks — remove ${lockedCount - 9} lock(s) (max 9)`;
+      } else {
+        subsetWarning.style.display = 'none';
+      }
+    } catch (e) {
+      console.warn('Failed to update lock warning', e);
+    }
+  };
+
+  document.querySelectorAll('.subset-color').forEach(b => {
+    // Toggle lock on Shift+Click only (avoid hijacking right-click/context menu)
+    const toggleLock = (e) => {
+      if (e.type === 'click' && e.shiftKey) {
+        e.preventDefault();
+        b.classList.toggle('locked');
+        updateSubsetInput();
+        return true;
+      }
+      return false;
+    };
+
+    b.addEventListener('click', (e) => {
+      if (toggleLock(e)) return;
+      // Normal Click -> toggle Selection (for pool)
+      b.classList.toggle('selected');
+      updateSubsetInput();
     });
   });
+
+  /* ── Clear Subset Button ────────────────────────────────── */
+  const clearSubsetBtn = document.getElementById('clearSubset');
+  if (clearSubsetBtn) {
+    clearSubsetBtn.addEventListener('click', () => {
+      document.querySelectorAll('.subset-color').forEach(b => {
+         b.classList.remove('selected');
+         b.classList.remove('locked');
+      });
+      updateSubsetInput();
+    });
+  }
+
+  /* ── Clear Locks Button (remove only lock state, keep selections) ---- */
+  const clearLocksBtn = document.getElementById('clearLocks');
+  if (clearLocksBtn) {
+    clearLocksBtn.addEventListener('click', () => {
+      document.querySelectorAll('.subset-color.locked, .add-color.locked').forEach(el => el.classList.remove('locked'));
+      updateSubsetInput();
+    });
+  }
+
+  /* ── Use Current Pattern as Subset ──────────────────────── */
+  const useCurrentSubsetBtn = document.getElementById('useCurrentSubset');
+  if (useCurrentSubsetBtn) {
+    useCurrentSubsetBtn.addEventListener('click', () => {
+      const slots = getSlots();
+      const currentColors = new Set();
+      slots.forEach(row => {
+        const val = row.querySelector('.slot-select').value;
+        if (val) currentColors.add(val);
+      });
+
+      if (currentColors.size === 0) {
+        alert("No colors in hotbar to select.");
+        return;
+      }
+
+      document.querySelectorAll('.subset-color').forEach(b => {
+        if (b.classList.contains('locked')) return;
+        if (currentColors.has(b.dataset.color)) {
+          b.classList.add('selected');
+        } else {
+          b.classList.remove('selected');
+        }
+      });
+      updateSubsetInput();
+    });
+  }
 
   /* ── Restore subset selection on page load ──────────────── */
   const subsetInput = document.getElementById('subsetInput');
@@ -510,6 +672,8 @@ document.addEventListener('DOMContentLoaded', () => {
     document.querySelectorAll('.subset-color').forEach(b => {
       if (list.includes(b.dataset.color)) b.classList.add('selected');
     });
+    // ensure warning reflects any persisted locked state
+    updateLockWarning();
   }
 
   /* ── Select-change & auto-weight checkbox listeners ─────── */

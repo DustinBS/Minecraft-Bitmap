@@ -262,6 +262,7 @@ main {
 
 .subset-color {
   display: flex;
+  position: relative;
   align-items: center;
   justify-content: center;
   width: 30px;
@@ -270,8 +271,24 @@ main {
   border-radius: 50%;
   border: 2px solid var(--sidebar-input-border);
   background: var(--sidebar-input-bg);
-  cursor: pointer;
+  cursor: context-menu; /* Hint at right-click */
   transition: transform var(--transition), border-color var(--transition), box-shadow var(--transition);
+}
+
+.subset-color .lock-icon {
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  font-size: 10px;
+  display: none;
+  background: var(--sidebar-bg); /* Match background to cutout */
+  border-radius: 50%;
+  width: 14px;
+  height: 14px;
+  line-height: 14px;
+  text-align: center;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+  z-index: 5;
 }
 
 .subset-color:hover {
@@ -283,6 +300,16 @@ main {
   border-color: var(--accent);
   box-shadow: 0 0 0 2px var(--accent-glow);
   transform: scale(1.08);
+}
+
+.subset-color.locked {
+  border-color: #f59e0b; /* Amber-500 */
+  background: rgba(245, 158, 11, 0.06);
+  transform: scale(1.03);
+}
+
+.subset-color.locked .lock-icon {
+  display: block;
 }
 
 /* -- Small Buttons -------------------------------------------- */
@@ -578,6 +605,32 @@ main {
   font-size: 13px;
   color: var(--sidebar-muted);
   margin-bottom: 6px;
+}
+
+.subset-warning {
+  color: #dc2626; /* red-600 */
+  font-size: 13px;
+  margin-top: 6px;
+}
+
+/* Ghost / underlined link-style button used for Clear Locks */
+.ghost-link {
+  display: inline-block;
+  margin-left: 10px;
+  background: transparent;
+  border: none;
+  padding: 0;
+  color: var(--sidebar-muted);
+  text-decoration: underline;
+  cursor: pointer;
+  font-size: 13px;
+}
+.ghost-link:hover { color: var(--accent); }
+
+.subset-tools {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 8px;
 }
 
 /* -- Dimensions Heading --------------------------------------- */
@@ -893,3 +946,13 @@ main {
   color: var(--text-muted);
   font-style: italic;
 }
+
+/* Locked state for swatches */
+/* Locked state for swatches: visual handled by .subset-color.locked and .add-color.locked
+   individual lock icon is provided via .lock-icon element to avoid ::after duplicates */
+.add-color.locked, .subset-color.locked {
+  position: relative;
+  opacity: 0.9;
+  cursor: pointer;
+}
+

@@ -34,8 +34,7 @@ def generate_image(width_blocks, height_blocks, choices, block_px=16):
     
     # 1. Generate the small application-grid image (1 user-block = 1 image-pixel)
     # Using 'P' (palette) mode or just RGB. Since we are scaling up later,
-    # let's just make an RGB image of size (w, h) and resize it.
-    # This avoids the nested loops per pixel.
+    # create an RGB image of size (w, h) and resize it.
     
     small_img = Image.new("RGB", (w, h))
     pixels = small_img.load()
@@ -109,7 +108,6 @@ def index():
 
     if not choices:
         # Provide a simple default distribution (2 pink, 4 magenta, 3 purple)
-        # Weights are just counts of slots basically
         choices = [
             ("pink", 1), ("pink", 1),
             ("magenta", 1), ("magenta", 1), ("magenta", 1), ("magenta", 1),
